@@ -1,12 +1,12 @@
 #include <PID_v1.h>     //  MODULO DE PID
-
+#include <neotimer.h>
 #define TempoLigarMotor 500000 //  Tempo para o motor começar a rodar após liberação de partida (Dado em microsegundos)
 #define IntervaloRPM  50000  // Define o valor do intervalo de tempo para calculo do rpm (Dado em microsegundos)
 #define IntervaloPID  50000  // Intervalo de processamento do PID
-
+Neotimer parando = Neotimer(1000);// Tempo de 1 segundos para ainda enviar dados após o motor parar
 
 double Setpoint, Input, Output; //  Parametros do PID
-PID myPID(&Input, &Output, &Setpoint,0.000336,0.00783,0, DIRECT); // Bloco do PID
+PID myPID(&Input, &Output, &Setpoint,0.0053,0.1766,0, DIRECT); // Bloco do PID
 
 // Declaração de pinagem das entradas ou saídas
 const int bot1 = 22;      // Giro do motor
@@ -30,7 +30,6 @@ int refMotor0, velmotor0, rpm;
 int velmotor1; // Variável de setpoint do motor - Este vindo do seno
 int velmotor3; // Variável de setpoint do motor - Controle PID
 int rpm_pwm;  
-//int entrada = 70;
 //variáveis para fazer o motor rodar:
 bool atraso, ligaMotor, bot1Estado, Ligar = false;
 
@@ -42,14 +41,12 @@ void setup() {
   pinMode(pinA, INPUT_PULLUP);
   // Configura a função de interrupção para os pulsos dos canais A e B
   attachInterrupt(digitalPinToInterrupt(pinA), contarPulsoA, RISING);
-  Serial.begin(9600);
+  Serial.begin(115200);
 }
 
 void loop() {
   Input = rpm;
-  //Setpoint = 1500;
   Setpoint = refMotor0;
-  //calcularTempoCicloLeitura();
   calculaRPM();
   ImprimeStatus();
   controleMotor();
@@ -62,21 +59,15 @@ void loop() {
 void ImprimeStatus(){
   
     //Gera Tempo em µs para geração de gráfico
-    //Serial.print("Tempo:");
     Serial.print(micros());
     Serial.print(",");
-    //Serial.print("Ciclo_CPU:");
-    //Serial.print(tempoDecorridoPrg);
-    //Serial.print(" µs,");
-    //Serial.print("Saida_PWM:");
+    //Saida_PWM
     Serial.print(Output);
     Serial.print(",");
     //Referência do motor no instante
-    //Serial.print("Referência:");
     Serial.print(Setpoint);
     Serial.print(",");
     //Velocidade real do motor
-    //Serial.print("Vel_Real:");
     Serial.print(rpm); //input
     Serial.println();
 
@@ -128,7 +119,7 @@ void calculaPID(){
 
 void controleMotor(){
   if(ligaMotor){
-    refMotor0 = map(84,0,90,0,1500); //Referência do motor de 0 a 2040 rpm
+    refMotor0 = map(45,0,90,0,1500); //Referência do motor de 0 a 2040 rpm
   }
   else{
       refMotor0 = 0;
@@ -137,6 +128,7 @@ void controleMotor(){
   //bot1Estado = true;
   bot1Estado = digitalRead(bot1);
   if (bot1Estado == 0){
+    parando.start();
     atraso = true;
     if(ligaMotor){
       GiroHorario();
@@ -145,7 +137,9 @@ void controleMotor(){
   }
 
   if (bot1Estado == 1){
-    ImprimeStatus();
+    if (parando.waiting()){
+      ImprimeStatus();
+    }
     paraMotor();
     atraso = false;
     ligaMotor = false;
